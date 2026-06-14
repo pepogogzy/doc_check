@@ -24,7 +24,13 @@ class StoreDocumentRequest extends FormRequest
                 'required',
                 'file',
                 'max:20480',
-                'mimes:pdf,docx,doc,txt,png,jpg,jpeg,gif,bmp,webp',
+                function ($attribute, $value, $fail) {
+                    $ext = strtolower($value->getClientOriginalExtension());
+                    $allowed = ['pdf', 'docx', 'doc', 'txt', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'];
+                    if (!in_array($ext, $allowed)) {
+                        $fail('Allowed types: PDF, DOCX, DOC, TXT, PNG, JPG, GIF, BMP, WEBP.');
+                    }
+                },
             ],
         ];
     }
@@ -32,8 +38,7 @@ class StoreDocumentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'document.max'   => 'The document must not exceed 20 MB.',
-            'document.mimes' => 'Allowed types: PDF, DOCX, DOC, TXT, PNG, JPG, GIF, BMP, WEBP.',
+            'document.max' => 'The document must not exceed 20 MB.',
         ];
     }
 }

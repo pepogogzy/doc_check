@@ -198,25 +198,26 @@ PROMPT;
         }
 
         $mime = $document->mime_type;
+        $ext = strtolower(pathinfo($document->filename, PATHINFO_EXTENSION));
 
-        if (str_starts_with($mime, 'text/')) {
+        if (str_starts_with($mime, 'text/') || $ext === 'txt') {
             return file_get_contents($fullPath);
         }
 
-        if ($mime === 'application/pdf') {
+        if ($mime === 'application/pdf' || $ext === 'pdf') {
             return $this->extractPdfText($fullPath);
         }
 
         if (in_array($mime, [
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/msword',
-        ])) {
+            'application/zip',
+            'application/octet-stream',
+        ]) || in_array($ext, ['docx', 'doc'])) {
             return $this->extractDocxText($fullPath);
         }
 
-        if (str_starts_with($mime, 'image/')) {
-            // For images we return a placeholder; real OCR would require
-            // something like Tesseract or OpenAI Vision.
+        if (str_starts_with($mime, 'image/') || in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'])) {
             return '[Image content – OCR not implemented. Upload a text-based document for analysis.]';
         }
 
@@ -250,19 +251,44 @@ PROMPT;
 
     protected function fallbackDocxExtract(string $path): string
     {
-        $zip = new \ZipArchive();
-        if ($zip->open($path) !== true) {
-            throw new Exception('Failed to open DOCX as ZIP archive');
+        $xml = false;
+
+        if (class_exists(\ZipArchive::class)) {
+            $zip = new \ZipArchive();
+            if ($zip->open($path) === true) {
+                $xml = $zip->getFromName('word/document.xml');
+                $zip->close();
+            }
         }
 
-        $xml = $zip->getFromName('word/document.xml');
-        $zip->close();
+        if ($xml === false) {
+            $tmpDir = sys_get_temp_dir() . '/docx_' . uniqid();
+            @mkdir($tmpDir, 0777, true);
+
+            $escaped = escapeshellarg($path);
+            $escapedDir = escapeshellarg($tmpDir);
+            exec("unzip -o {$escaped} -d {$escapedDir} 2>/dev/null", $output, $exitCode);
+
+            $xmlPath = "{$tmpDir}/word/document.xml";
+
+            if ($exitCode !== 0 || !file_exists($xmlPath)) {
+                $this->rmdirRecursive($tmpDir);
+                throw new Exception('Failed to extract DOCX text. Install php-zip: sudo apt install php8.2-zip');
+            }
+
+            $xml = file_get_contents($xmlPath);
+            $this->rmdirRecursive($tmpDir);
+        }
 
         if ($xml === false) {
             throw new Exception('Could not find word/document.xml in DOCX archive');
         }
 
         $xml = simplexml_load_string($xml);
+        if ($xml === false) {
+            throw new Exception('Failed to parse word/document.xml in DOCX archive');
+        }
+
         $namespaces = $xml->getNamespaces(true);
         $body = $xml->children($namespaces['w'])->body ?? $xml->body;
 
@@ -275,5 +301,27 @@ PROMPT;
         }
 
         return trim($text);
+    }
+
+    protected function rmdirRecursive(string $dir): void
+    {
+        if (! is_dir($dir)) {
+            return;
+        }
+
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($items as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getRealPath());
+            } else {
+                @unlink($item->getRealPath());
+            }
+        }
+
+        @rmdir($dir);
     }
 }

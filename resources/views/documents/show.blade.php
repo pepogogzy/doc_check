@@ -50,6 +50,15 @@
 
                 <div class="lg:col-span-2 space-y-6">
                     @if($document->analysis)
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-semibold text-[#111110] dark:text-white">Analysis Results</h2>
+                            <form action="{{ route('documents.analysis.delete', $document) }}" method="POST"
+                                  onsubmit="return confirm('Remove this analysis?')">
+                                @csrf
+                                <button type="submit" class="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700">Remove Analysis</button>
+                            </form>
+                        </div>
+
                         <div class="bg-white dark:bg-[#161615] border border-[#e5e5e0] dark:border-[#2a2a28] rounded-xl p-6">
                             <h2 class="text-lg font-semibold text-[#111110] dark:text-white mb-4">Summary</h2>
                             <p class="text-sm text-[#6b6b66] dark:text-[#a8a8a2]">{{ $document->analysis->summary }}</p>

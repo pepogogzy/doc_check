@@ -24,6 +24,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
     Route::get('/documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
     Route::post('/documents/{document}/analyze', [DocumentController::class, 'analyze'])->name('documents.analyze');
+    Route::post('/documents/{document}/analysis/delete', [DocumentController::class, 'destroyAnalysis'])->name('documents.analysis.delete');
+    Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
     // Rules
     Route::get('/rules', [RuleController::class, 'index'])->name('rules.index');
